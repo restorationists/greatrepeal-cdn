@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "minify": "node -e \"const fs=require('fs').promises;const{minify}=require('html-minifier-terser');(async()=>{const html=await fs.readFile('draft.html','utf8');const min=await minify(html,{collapseWhitespace:true,removeComments:true,removeRedundantAttributes:true,removeScriptTypeAttributes:true,removeStyleLinkTypeAttributes:true,useShortDoctype:true,minifyCSS:true,minifyJS:true,minifyURLs:true,processScripts:['application/ld+json'],ignoreCustomFragments:[/<%[\\s\\S]*?%>/,/<\\?[\\s\\S]*?\\?>/]});await fs.writeFile('index.html',min);console.log('✓ Minified draft.html → index.html');})().catch(console.error)\""
+  },
+  "devDependencies": {
+    "html-minifier-terser": "^7.2.0"
+  }
+}
