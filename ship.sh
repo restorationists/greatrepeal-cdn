@@ -68,44 +68,77 @@ function upload_to_cdn() {
         exit 1
     fi
 
-    # Upload files to BunnyCDN
     echo "🔍 Debug info:"
     echo "  Region: '$TS_BUNNY_REGION'"
-    echo "  Bucket: '$TS_BUNNY_BUCKET'" 
+    echo "  Bucket: '$TS_BUNNY_BUCKET'"
     echo "  Token: '${TS_BUNNY_BUCKET_TOKEN:0:10}...'"
     echo "  Token length: ${#TS_BUNNY_BUCKET_TOKEN}"
     echo ""
-    
-    find "$DIST_DIR" -type f ! -path "$DIST_DIR/.git/*" ! -name ".git" | while read -r file; do
-        relative_path="${file#$DIST_DIR/}"
-        
-        # Handle primary region (DE/Frankfurt) vs regional endpoints
-        if [[ "$TS_BUNNY_REGION" == "de" || "$TS_BUNNY_REGION" == "primary" ]]; then
-            remote_url="https://storage.bunnycdn.com/${TS_BUNNY_BUCKET}/${relative_path}"
-        else
-            remote_url="https://${TS_BUNNY_REGION}.storage.bunnycdn.com/${TS_BUNNY_BUCKET}/${relative_path}"
-        fi
-        echo "🟢 Uploading: $relative_path → $remote_url"
 
-        # Try upload with verbose output on failure
-        if ! curl --silent --show-error --fail --request PUT \
-            --url "$remote_url" \
-            --header "AccessKey: $TS_BUNNY_BUCKET_TOKEN" \
-            --header "Content-Type: application/octet-stream" \
-            --data-binary @"$file"; then
-            echo "❌ Failed to upload: $relative_path"
-            echo "🔍 Retrying with verbose output..."
-            curl -v --request PUT \
+    # Allowed file extensions (html, css, js, images, fonts)
+    # images: png jpg jpeg gif svg webp avif ico bmp tiff
+    # fonts: woff woff2 ttf otf eot
+    # also include mjs for JS modules
+    find "$DIST_DIR" \
+        \( -path "$DIST_DIR/.git" -o -path "$DIST_DIR/.git/*" -o -path "$DIST_DIR/node_modules" -o -path "$DIST_DIR/node_modules/*" \) -prune -o \
+        -type f \
+        \( \
+            -iname '*.html' -o \
+            -iname '*.css'  -o \
+            -iname '*.js'   -o \
+            -iname '*.mjs'  -o \
+            -iname '*.png'  -o \
+            -iname '*.jpg'  -o \
+            -iname '*.jpeg' -o \
+            -iname '*.gif'  -o \
+            -iname '*.svg'  -o \
+            -iname '*.webp' -o \
+            -iname '*.avif' -o \
+            -iname '*.ico'  -o \
+            -iname '*.bmp'  -o \
+            -iname '*.tif'  -o \
+            -iname '*.tiff' -o \
+            -iname '*.woff' -o \
+            -iname '*.woff2' -o \
+            -iname '*.ttf'  -o \
+            -iname '*.otf'  -o \
+            -iname '*.eot' \
+        \) -print0 | while IFS= read -r -d '' file; do
+            # Make a clean relative path regardless of "." or "./" or a subdir in DIST_DIR
+            if [[ "$DIST_DIR" == "." || "$DIST_DIR" == "./" ]]; then
+                relative_path="${file#./}"
+            else
+                # strip leading "./" if present, then remove "$DIST_DIR/"
+                tmp="${file#./}"
+                relative_path="${tmp#"$DIST_DIR"/}"
+            fi
+
+            # Build remote URL based on region
+            if [[ "$TS_BUNNY_REGION" == "de" || "$TS_BUNNY_REGION" == "primary" ]]; then
+                remote_url="https://storage.bunnycdn.com/${TS_BUNNY_BUCKET}/${relative_path}"
+            else
+                remote_url="https://${TS_BUNNY_REGION}.storage.bunnycdn.com/${TS_BUNNY_BUCKET}/${relative_path}"
+            fi
+
+            echo "🟢 Uploading: $relative_path → $remote_url"
+
+            if ! curl --silent --show-error --fail --request PUT \
                 --url "$remote_url" \
                 --header "AccessKey: $TS_BUNNY_BUCKET_TOKEN" \
                 --header "Content-Type: application/octet-stream" \
-                --data-binary @"$file"
-            exit 1
-        fi
-    done
+                --data-binary @"$file"; then
+                echo "❌ Failed to upload: $relative_path"
+                echo "🔍 Retrying with verbose output..."
+                curl -v --request PUT \
+                    --url "$remote_url" \
+                    --header "AccessKey: $TS_BUNNY_BUCKET_TOKEN" \
+                    --header "Content-Type: application/octet-stream" \
+                    --data-binary @"$file"
+                exit 1
+            fi
+        done
 
     echo "🟢 FLUSHING BUNNY CACHE: https://api.bunny.net/pullzone/${TS_BUNNY_PULLZONE_ID}/purgeCache"
-
     if ! curl --silent --show-error --fail --request POST \
         --url "https://api.bunny.net/pullzone/${TS_BUNNY_PULLZONE_ID}/purgeCache" \
         --header "AccessKey: $TS_BUNNY_API_KEY" \
@@ -115,7 +148,6 @@ function upload_to_cdn() {
     fi
 
     echo "🟢 FLUSHING CLOUDFLARE CACHE: https://api.cloudflare.com/client/v4/zones/${TS_CLOUDFLARE_ZONE}/purge_cache"
-    
     if ! curl --silent --show-error --fail -X POST \
         "https://api.cloudflare.com/client/v4/zones/${TS_CLOUDFLARE_ZONE}/purge_cache" \
         -H 'Content-Type: application/json' \
