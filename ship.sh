@@ -17,7 +17,7 @@ fi
 # Validate required environment variables
 required_vars=(
     "TS_BUNNY_REGION"
-    "TS_BUNNY_BUCKET" 
+    "TS_BUNNY_BUCKET"
     "TS_BUNNY_BUCKET_TOKEN"
     "TS_BUNNY_PULLZONE_ID"
     "TS_BUNNY_API_KEY"
@@ -42,18 +42,18 @@ COMMIT_MSG="Ship dist $TIME at $DATE"
 
 function push_repo() {
     echo "📦 Pushing dist to Git..."
-    
+
     if [[ ! -d "$DIST_DIR" ]]; then
         echo "❌ Distribution directory '$DIST_DIR' does not exist!"
         exit 1
     fi
-    
+
     # Check if this is a git repository (git should be in root)
     if [[ ! -d ".git" ]]; then
         echo "❌ Current directory is not a git repository!"
         exit 1
     fi
-    
+
     git add "$DIST_DIR"
     git commit -m "$COMMIT_MSG" || echo "⚠️  Nothing to commit."
     git push origin HEAD
@@ -62,7 +62,7 @@ function push_repo() {
 
 function upload_to_cdn() {
     echo "🚀 Uploading dist to BunnyCDN..."
-    
+
     if [[ ! -d "$DIST_DIR" ]]; then
         echo "❌ Distribution directory '$DIST_DIR' does not exist!"
         exit 1
@@ -75,13 +75,14 @@ function upload_to_cdn() {
     echo "  Token length: ${#TS_BUNNY_BUCKET_TOKEN}"
     echo ""
 
-    # Allowed file extensions (html, css, js, images, fonts)
-    # images: png jpg jpeg gif svg webp avif ico bmp tiff
-    # fonts: woff woff2 ttf otf eot
-    # also include mjs for JS modules
-    find "$DIST_DIR" \
-        \( -path "$DIST_DIR/.git" -o -path "$DIST_DIR/.git/*" -o -path "$DIST_DIR/node_modules" -o -path "$DIST_DIR/node_modules/*" \) -prune -o \
-        -type f \
+    # Find only allowed file types and exclude .git and node_modules anywhere in the path
+    # Allowed:
+    #  - HTML/CSS/JS: html, css, js, mjs
+    #  - Images: png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tif, tiff
+    #  - Fonts: woff, woff2, ttf, otf, eot
+    find "$DIST_DIR" -type f \
+        ! -path '*/.git/*' \
+        ! -path '*/node_modules/*' \
         \( \
             -iname '*.html' -o \
             -iname '*.css'  -o \
@@ -104,12 +105,12 @@ function upload_to_cdn() {
             -iname '*.otf'  -o \
             -iname '*.eot' \
         \) -print0 | while IFS= read -r -d '' file; do
-            # Make a clean relative path regardless of "." or "./" or a subdir in DIST_DIR
+            # Compute relative path
             if [[ "$DIST_DIR" == "." || "$DIST_DIR" == "./" ]]; then
                 relative_path="${file#./}"
             else
-                # strip leading "./" if present, then remove "$DIST_DIR/"
                 tmp="${file#./}"
+                # ensure we strip "$DIST_DIR/" prefix if present
                 relative_path="${tmp#"$DIST_DIR"/}"
             fi
 
@@ -178,21 +179,21 @@ function usage() {
 
 # Main execution
 case "${1:-both}" in
-    repo) 
-        npm run minify && push_repo 
+    repo)
+        npm run minify && push_repo
         ;;
-    cdn) 
-        npm run minify &&upload_to_cdn 
+    cdn)
+        npm run minify && upload_to_cdn
         ;;
-    both) 
-        npm run minify && push_repo && upload_to_cdn 
+    both)
+        npm run minify && push_repo && upload_to_cdn
         ;;
     help|--help|-h)
         usage
         ;;
-    *) 
+    *)
         echo "❌ Invalid argument: $1"
-        usage 
+        usage
         ;;
 esac
 
