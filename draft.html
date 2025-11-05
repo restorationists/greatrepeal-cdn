@@ -281,6 +281,26 @@
             height: 100%;
         }
     }
+    /* Mobile: Stack thumbnail above text */
+@media (max-width: 767.98px) {
+  .article-item {
+    flex-direction: column;
+    align-items: center; /* ensures thumbnail is centered */
+    text-align: center;  /* optional: also center headings & description */
+  }
+
+  .article-thumbnail {
+    max-width: 100%; /* allow image to scale full width */
+    width: 100%;
+    height: auto;
+  }
+
+  .article-content {
+    width: 100%;
+    text-align: left; /* or keep centered if you prefer */
+    margin-top: 1rem;
+  }
+}
     </style>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XS7GCGBPRM"></script>
     <script>
